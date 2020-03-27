@@ -6,7 +6,7 @@ Export your FreeCAD documents in an .html file to show it in a browser using the
 
 Installing
 
-- Copy the files ActivateHTML.FCMacro, exportHTML.py and TemplateExportThreejs.html (without folder) to your macros directory.
+- Copy the files ActivateHTML.FCMacro, exportHTML.py and TemplateExportThreejs.html (without directory) to your macros directory.
 
 
 Activating
