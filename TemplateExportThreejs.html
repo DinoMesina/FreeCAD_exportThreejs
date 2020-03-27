@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title> FreeCAD model </title>
+  </head>
+  <body>
+    <div id='canvas'></div>
+    
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/three.js/110/three.min.js"></script>
+    <!--<script type="text/javascript" src="three.min.js"></script>-->
+    <script type="text/javascript">
+      var scene, renderer, camera, controls,
+	  spotLight0, spotLight1, spotLight2, spotLightHelper0, spotLightHelper1, spotLightHelper2,
+	  spotLight3, spotLight4, spotLight5, spotLightHelper3, spotLightHelper4, spotLightHelper5,
+	  hemisphereLight0, hemisphereLight1, hemisLightHelper0, hemisLightHelper1,
+	  dirLight0, dirLight1, dirLightHelper0, dirLightHelper1,
+	  geom, materialPhong,
+	  planeBottom,
+	  rotateObject = true, animationSpeed = 0.0035,
+	  cameraRotateSpeed = Math.PI * 0.002,
+	  keypressed = false, keyboard = {},
+	  isDragging = false, isZooming = false, isMoving = false,
+	  mouseScalar = 0.5,
+	  zoomScalar = 10.0,
+	  keyboardMoveSpeed = 1.0,
+	  previousMousePosition = { 
+              x: 0, 
+              y: 0 
+	  };
+      
+      var aumenta = true, ripetizioni = 1;
+      
+      var geomXYZ;
+      
+      if (false) {
+	  (function(){var script=document.createElement('script');script.onload=function(){var stats=new Stats();document.body.appendChild(stats.dom);requestAnimationFrame(function loop(){stats.update();requestAnimationFrame(loop)});};script.src='http://mrdoob.github.io/stats.js/build/stats.min.js';document.head.appendChild(script);})()
+      }
+      
+      // inizializzo la scena
+      init();
+      
+      // setto la scala della mesh per evitare che il primo refrash sia errato
+      mesh.scale.set(0.01, 0.01, 0.01);
+      // animo la scena
+      animateIntro();
+      
+      // inizializzo la scena 
+      function init() {
+	  /* creo la scena, camera ecc. */ 
+          scene = new THREE.Scene();
+	  scene.background = new THREE.Color(0xababab);
+
+	  renderer = new THREE.WebGLRenderer({ antialias: true });
+          renderer.setSize(window.innerWidth - 20 , window.innerHeight - 20);
+          renderer.setPixelRatio(window.devicePixelRatio);
+	  // abilito le ombre 
+	  renderer.shadowMap.enabled = true;
+	  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+	  
+          document.body.appendChild(renderer.domElement);
+
+	  // creo la geometria 
+          createGeom();
+
+	  // calcolo le normali 
+	  geom.computeFaceNormals();
+          //geom.computeFlatVertexNormals();
+	  
+	  // centro la geometria e calcolo il BoundingBox 
+	  geom.computeBoundingBox();
+	  geom.translate((geom.boundingBox.min.x + geom.boundingBox.max.x) / -2,
+			 (geom.boundingBox.min.y + geom.boundingBox.max.y) / -2,
+			 (geom.boundingBox.min.z + geom.boundingBox.max.z) / -2);
+	  geom.computeBoundingBox();
+	  geom.computeBoundingSphere();
+	  
+  	  // creo il materiale 
+          materialPhong = new THREE.MeshPhongMaterial();
+          materialPhong.color.setHex(0x0d0d0d); 
+          materialPhong.emissive.setHex(0x0f0f0f);
+	  materialPhong.emissiveIntensity = 0.75;
+          materialPhong.specular.setHex(0x070707);
+          materialPhong.shininess = 30;
+          
+          // creo la mesh
+	  mesh = new THREE.Mesh(geom);
+	  //mesh = new THREE.Mesh(geomXYZ);
+	  
+	  // setto il materiale 
+	  mesh.material = materialPhong;
+	  
+	  // aggiungo le ombre
+	  mesh.receiveShadow = true;
+	  mesh.castShadow = true;
+	  
+	  // aggiungo la mesh alla scena 
+          scene.add(mesh);
+	  
+	  // creo e posiziono la camera per guardare la mesh 
+	  camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 1, 10000);
+	  camera.position.x = 0.1 * geom.boundingSphere.radius;
+	  camera.position.y = 1.7 * geom.boundingSphere.radius;
+	  camera.position.z = 3.0 * geom.boundingSphere.radius;
+          camera.lookAt(mesh.position);
+	  
+	  // creo il piano
+	  var planeGeo = new THREE.PlaneBufferGeometry((100 * geom.boundingSphere.radius), (100 * geom.boundingSphere.radius));
+	  
+	  // creo un piano parallelo al piano XZ 
+	  planeBottom = new THREE.Mesh(planeGeo, new THREE.MeshPhongMaterial({color: 0x383838}))
+	  planeBottom.position.y = -1.5 * geom.boundingSphere.radius;
+	  planeBottom.rotateX(-Math.PI / 2);
+	  planeBottom.receiveShadow = true;
+	  scene.add(planeBottom);
+	  
+          // creo le luci 
+	  spotLight0 = new THREE.SpotLight(0xffffff, 0.8);
+          spotLight0.position.x = 0.0; 
+	  spotLight0.position.y = 0.7071 * 5 * geom.boundingSphere.radius; // a 45° sul piano YZ
+	  spotLight0.position.z = 0.7071 * 5 * geom.boundingSphere.radius; 
+	  spotLight0.angle = Math.sin(1.33 * geom.boundingSphere.radius / spotLight0.position.distanceTo(mesh.position));
+	  spotLight0.penumbra = 0.25;
+	  spotLight0.castShadow = true;
+	  spotLight0.shadow.mapSize.width = 1024 * 4;
+	  spotLight0.shadow.mapSize.height = 1024 * 4;
+	  spotLight0.shadow.camera.near = 0.05 * geom.boundingSphere.radius; 
+	  spotLight0.shadow.camera.far = 50.0 * geom.boundingSphere.radius; 
+	  spotLight0.shadow.camera.fov = 3;
+	  scene.add(spotLight0)
+	  
+          spotLight1 = new THREE.SpotLight(0xffffff, 0.6);
+          spotLight1.position.x = 0.5 * 5 * geom.boundingSphere.radius; // 45° sul piano ZX ruotato di 45° in XY 
+	  spotLight1.position.y = 0.4 * 5 * geom.boundingSphere.radius; // 0.5
+	  spotLight1.position.z = 0.7071 * 5 * geom.boundingSphere.radius; 
+	  spotLight1.angle = Math.sin(1.25 * geom.boundingSphere.radius / spotLight1.position.distanceTo(mesh.position));
+	  spotLight1.penumbra = 0.25;
+	  spotLight1.castShadow = false;
+          scene.add(spotLight1);
+	  
+          spotLight2 = new THREE.SpotLight(0xffffff, 0.6);
+	  spotLight2.position.x = -0.5 * 5 * geom.boundingSphere.radius; // 45° sul piano XZ ruotato di 135° in XY
+	  spotLight2.position.y = 0.4 * 5 * geom.boundingSphere.radius; 
+	  spotLight2.position.z = 0.7071 * 5 * geom.boundingSphere.radius; 
+	  spotLight2.angle = Math.sin(1.25 * geom.boundingSphere.radius / spotLight2.position.distanceTo(mesh.position));
+	  spotLight2.penumbra = 0.25;
+	  spotLight2.castShadow = false;
+          scene.add(spotLight2);
+	  
+	  spotLight3 = new THREE.SpotLight(0xffffff, 0.8);
+          spotLight3.position.x = -2 * geom.boundingSphere.radius; // -135° alto Sx
+	  spotLight3.position.y = 2 * geom.boundingSphere.radius; // 5
+	  spotLight3.position.z = 10 * geom.boundingSphere.radius; // 5
+	  spotLight3.angle = Math.sin(1.25 * geom.boundingSphere.radius / spotLight3.position.distanceTo(mesh.position));
+	  spotLight3.penumbra = 0.25;
+	  spotLight3.castShadow = false;
+	  scene.add(spotLight3)
+	  
+          spotLight4 = new THREE.SpotLight(0xffffff, 0.8);
+          spotLight4.position.x = 2 * geom.boundingSphere.radius; // -45° alto Dx 
+	  spotLight4.position.y = 2 * geom.boundingSphere.radius; 
+	  spotLight4.position.z = 10 * geom.boundingSphere.radius; // 5
+	  spotLight4.angle = Math.sin(1.25 * geom.boundingSphere.radius / spotLight4.position.distanceTo(mesh.position));
+	  spotLight4.penumbra = 0.25;
+	  spotLight4.castShadow = false;
+          scene.add(spotLight4);
+	  
+	  // emisferica 
+	  hemisphereLight0 = new THREE.HemisphereLight(0xf0f0f0, 0x020202, 1.8);
+          hemisphereLight0.position.x = 0.0 * geom.boundingSphere.radius;
+	  hemisphereLight0.position.y = 2.0 * geom.boundingSphere.radius;
+	  hemisphereLight0.position.z = 2.0 * geom.boundingSphere.radius;
+	  hemisphereLight0.castShadow = false;
+	  scene.add(hemisphereLight0);
+	  
+	  // direzionale 
+	  dirLight0 = new THREE.DirectionalLight(0xddddddd, 1.5);
+	  dirLight0.position.x = 0.25 * geom.boundingSphere.radius;
+	  dirLight0.position.y = 1.55 * geom.boundingSphere.radius;
+	  dirLight0.position.z = 2.25 * geom.boundingSphere.radius;
+	  dirLight0.castShadow = false; // expensive!!!
+	  scene.add( dirLight0 );
+	  
+	  /* add listeners */
+	  /* window resize */
+          window.addEventListener('resize', onWindowResize, false);
+          /* Ruoto, sposto o zoommo la mesh alla pressione del tasto Dx e spostamento del mouse */
+	  document.addEventListener('mousedown', mouseDownEvent, false );
+	  document.addEventListener('mousemove', mouseMoveEvent, false);
+	  document.addEventListener('mouseup', mouseUpEvent, false);
+	  document.addEventListener('mousewheel', mouseWheelEvent, false);
+	  /* tastiera */
+	  document.addEventListener('keydown', keyboardDownEvent, false);
+	  document.addEventListener('keyup', keyboardUpEvent, false);
+	  
+      };
+      
+      /* animo la scena */ 
+      function animate() {
+	  
+	  requestAnimationFrame(animate);
+	  renderer.render(scene, camera);
+          
+	  // se è stato premuto almeno un tasto eseguo 
+	  if (keypressed) {
+	      /* modifico la scena in base alla pressione dei tasti */ 
+	      if (keyboard[82]) { // R key
+		  rotateObject = true;
+              }
+              if (keyboard[37]) { // left arrow key
+		  // shift?
+		  if (keyboard[16]) {
+		      camera.position.x -= keyboardMoveSpeed; // sposto la camera a Sx 
+		  } else 
+		      // control?
+		      if (keyboard[17]) {
+			  camera.position.z -= keyboardMoveSpeed; // avvicino la camera all'oggetto 
+		      } else {
+			  rotateObject = false;
+			  mesh.rotation.y -= cameraRotateSpeed; // ruoto l'oggetto 
+		      }
+              }
+              if (keyboard[38]) { // up arrow key
+		  // shift?
+		  if (keyboard[16]) {
+		      camera.position.y += keyboardMoveSpeed; // sposto la camera in alto 
+		  } else 
+		      // control?
+		      if (keyboard[17]) {
+			  camera.position.z -= keyboardMoveSpeed; // avvicino la camera all'oggetto 
+		      } else {
+			  mesh.rotation.x -= cameraRotateSpeed; // ruoto l'oggetto 
+		      }
+	      }
+              if (keyboard[39]) { // right arrow key
+		  // shift?
+		  if (keyboard[16]) {
+		      camera.position.x += keyboardMoveSpeed; // sposto la camera a Dx 
+		  } else 
+		      // control?
+		      if (keyboard[17]) {
+			  camera.position.z += keyboardMoveSpeed; // allontano la camera all'oggetto 
+		      } else {
+			  rotateObject = false;
+			  mesh.rotation.y += cameraRotateSpeed; // ruoto l'oggetto 
+		      }
+	      }
+              if (keyboard[40]) { // down arrow key
+		  // shift?
+		  if (keyboard[16]) {
+		      camera.position.y -= keyboardMoveSpeed; // sposto la camera in basso 
+		  } else 
+		      // control?
+		      if (keyboard[17]) {
+			  camera.position.z += keyboardMoveSpeed; // allontano la camera all'oggetto 
+		      } else {
+			  mesh.rotation.x += cameraRotateSpeed; // ruoto l'oggetto 
+		      }
+              }
+	  }
+	  
+	  // ruoto l'oggetto 
+          if (rotateObject) {
+              mesh.rotation.y += animationSpeed;
+          }
+      };
+      
+      /* faccio apparire l'oggetto facendolo crescere :) */
+      function animateIntro() {
+
+	  renderer.render(scene, camera);
+	  // abilito un timeout
+	  setTimeout( function() {
+	      if (aumenta) {
+		  var scala = Math.sin(ripetizioni * Math.PI / 180) * 1.221;
+		  mesh.scale.set(scala, scala, scala);
+		  mesh.rotation.y = (ripetizioni - 125) * Math.PI / 180;
+		  requestAnimationFrame(animateIntro);
+		  if (ripetizioni > 124) {
+		      aumenta = false;
+		  } else {
+		      ripetizioni++;
+		  }
+	      } else {
+		  mesh.scale.set(1.0, 1.0, 1.0);
+		  requestAnimationFrame(animate);
+		  return;
+	      }
+	  }, 1000 / 60 );
+      }
+      
+      /* on resize window */
+      function onWindowResize() {
+          camera.aspect = window.innerWidth / window.innerHeight;
+          camera.updateProjectionMatrix();
+          renderer.setSize(window.innerWidth - 20 , window.innerHeight - 20);
+          renderer.setPixelRatio(window.devicePixelRatio);
+      }
+      
+      /* on mouse click */
+      function mouseDownEvent(e) {
+          switch (e.button) {
+          case 0: // left button 
+	      if (e.shiftKey) {
+		  isMoving = true;
+		  isDragging = false;
+		  isZooming = false;
+	      } else 
+		  if (e.ctrlKey) {
+		      isMoving = false;
+		      isDragging = false;
+		      isZooming = true;
+		  } else {
+		      isMoving = false;
+		      isDragging = true;
+		      isZooming = false;
+		      rotateObject = false;
+		  }
+	      break;
+	      
+          case 1: // wheel button 
+	      isDragging = false;
+	      isZooming = true;
+	      break;
+	      
+          case 2: // right button
+	      isDragging = false;
+	      break;
+          }
+      }
+      
+      /* on mouse movement */
+      function mouseMoveEvent(e) {
+          var deltaMove = { 
+	      x: e.offsetX - previousMousePosition.x,
+	      y: e.offsetY - previousMousePosition.y 
+          };
+          
+          if (isDragging) {
+	      var deltaRotationQuaternion = new THREE.Quaternion();
+	      deltaRotationQuaternion.setFromEuler(
+		  new THREE.Euler(
+		      (deltaMove.y * (Math.PI / 180) * mouseScalar),
+		      (deltaMove.x * (Math.PI / 180) * mouseScalar),
+		      0,
+		      'XYZ'
+		  )
+	      );
+	      mesh.quaternion.multiplyQuaternions(deltaRotationQuaternion, mesh.quaternion);
+          }
+	  
+	  if (isZooming) {
+	      camera.position.z += deltaMove.y * mouseScalar;
+	  }
+	  
+	  if (isMoving) {
+	      camera.position.x -= deltaMove.x * mouseScalar * 0.5;
+	      camera.position.y += deltaMove.y * mouseScalar * 0.5;
+	  }
+          
+          previousMousePosition = {
+	      x: e.offsetX,
+	      y: e.offsetY
+          };
+      }
+      
+      /* on release mouse button */ 
+      function mouseUpEvent(e) {
+          isDragging = false;
+	  isZooming = false;
+	  isMoving = false;
+      }
+      
+      /* on turning the wheel */
+      function mouseWheelEvent(e) {
+          var vector = new THREE.Vector3();
+          var dir = new THREE.Vector3();
+          var position = camera.position;
+          
+          camera.updateMatrixWorld( true );
+          vector.set((e.clientX/window.innerWidth)*2 - 1, -(e.clientY/window.innerHeight)*2 + 1, 0.5);
+          vector.unproject(camera);
+          
+          var dir = vector.sub(position).normalize();
+          
+          if ( e.wheelDelta > 0 ) { // rotello in avanti
+	      camera.position.x += dir.x * zoomScalar;
+	      camera.position.y += dir.y * zoomScalar;
+	      camera.position.z += dir.z * zoomScalar;
+          }
+          if ( e.wheelDelta < 0 ) { // rotello in dietro
+	      camera.position.x -= dir.x * zoomScalar;
+	      camera.position.y -= dir.y * zoomScalar;
+	      camera.position.z -= dir.z * zoomScalar;
+          }
+      }
+      
+      /* on pressing a keyboard  key */
+      function keyboardDownEvent(e) {
+          keyboard[e.keyCode] = true;
+	  keypressed = true;
+      }
+      /* on release a keyboard key */
+      function keyboardUpEvent(e) {
+          keyboard[e.keyCode] = false;
+	  keypressed = false;
+      }
+      
+      /* create geometry */
+      function createGeom() {
+	  
+<!--InsertGeometryHere-->
+	  geom.computeFaceNormals();
+	  geom.rotateX(-Math.PI / 2);
+      }
+    </script>
+  </body>
+</html>

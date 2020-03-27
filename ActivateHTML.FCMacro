@@ -1,0 +1,4 @@
+import Path
+import PathGui
+
+FreeCAD.addExportType("HTML Three.je (*.html)", "exportHTML")
