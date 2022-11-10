@@ -14,3 +14,4 @@ Activating
 - To activate the possibility of exporting .html file execute "ActivateHTML.FCMacro" from Macro/Macro... menu.
 - Use File/Export dialog choosing "HTML Three.js (*.html)"
  
+[![Donate](https://img.shields.io/badge/Donate-PayPal-green.svg)](http://paypal.me/dinodf)
